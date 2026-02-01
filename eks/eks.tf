@@ -8,7 +8,7 @@ module "eks" {
   cluster_name    = "${var.cluster_name}-${var.environment}"
   cluster_version = var.eks_version
 
-  vpc_id     = var.create_vpc == true ? module.vpc[0].vpc_id : var.vpc_name
+  vpc_id     = var.create_vpc == true ? module.vpc[0].vpc_id : var.vpc_id
   subnet_ids = var.create_vpc == true ? module.vpc[0].private_subnets : var.subnets_lists
 
   cluster_endpoint_private_access = true

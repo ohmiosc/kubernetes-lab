@@ -3,21 +3,70 @@
 ########################
 data "aws_caller_identity" "current" {}
 
-########################
-# VPC (ejemplo simple)
-########################
+######
+
+
+########################################
+# Elastic IP - 1 por AZ
+########################################
+resource "aws_eip" "nat" {
+  for_each = var.create_vpc ? toset(var.zone_azs) : toset([])
+
+  domain = "vpc"
+
+  tags = {
+    Name        = "nat-eip-${var.environment}-${each.key}"
+    Environment = var.environment
+  }
+}
+
+########################################
+# VPC Module
+########################################
 module "vpc" {
-  count = var.create_vpc ? 1 : 0 
-  source  = "terraform-aws-modules/vpc/aws"
+  source = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
+  # Crear solo en ciertos ambientes
+  count = var.create_vpc ? 1 : 0 
 
-  name = "eks-vpc"
-  cidr = "10.0.0.0/16"
+  name = var.vpc_name
+  cidr = var.vpc_cidr
 
-  azs             = ["us-east-1a", "us-east-1b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  azs             = var.zone_azs
+  private_subnets = var.private_subnets
+  public_subnets  = var.public_subnets
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  ################################
+  # NAT Gateway - 1 por AZ
+  ################################
+  enable_nat_gateway     = true
+  single_nat_gateway     = false
+  one_nat_gateway_per_az = true
+
+  ################################
+  # Attach EIPs creados arriba
+  ################################
+  external_nat_ip_ids = values(aws_eip.nat)[*].id
+
+  ################################
+  # DNS
+  ################################
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  ################################
+  # Tags
+  ################################
+  tags = {
+    Environment = var.environment
+    Terraform   = "true"
+  }
+
+  # public_subnet_tags = {
+  #   "kubernetes.io/role/elb" = "1"
+  # }
+
+  # private_subnet_tags = {
+  #   "kubernetes.io/role/internal-elb" = "1"
+  # }
 }
